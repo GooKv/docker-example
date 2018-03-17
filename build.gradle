@@ -1,0 +1,88 @@
+import com.bmuschko.gradle.docker.tasks.image.*
+import com.bmuschko.gradle.docker.tasks.container.*
+
+group 'me.gookven.dockerx'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    ext.kotlin_version = '1.1.4-2'
+    ext.docker_plugin_version = '3.1.0'
+    ext.junit_version = '4.12'
+
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "com.bmuschko:gradle-docker-plugin:$docker_plugin_version"
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'kotlin'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+task fatJar(type: Jar) {
+    manifest {
+        attributes(
+                'Implementation-Title': project.name,
+                'Implementation-Version': version,
+                'Main-Class': 'MainKt'
+        )
+    }
+    baseName = "${project.name}-fat"
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+task createDockerFile(type: Dockerfile, dependsOn: fatJar) {
+    from 'java:8'
+    copyFile './build/libs', "/usr/src/${project.name}"
+    workingDir "/usr/src/${project.name}"
+    defaultCommand 'java', '-jar', "${project.name}-fat-${project.version}.jar"
+
+    destFile project.file('Dockerfile')
+
+    maintainer 'GooKv "gookven@gmail.com"'
+}
+
+task buildImage(type: DockerBuildImage, dependsOn: createDockerFile) {
+    inputDir = project.rootDir
+    tag = "${project.name}:latest"
+}
+
+task createAppContainer(type: DockerCreateContainer, dependsOn: buildImage) {
+    targetImageId { buildImage.imageId }
+}
+
+task dockerRun(type: DockerStartContainer, dependsOn: createAppContainer) {
+    targetContainerId { createAppContainer.containerId }
+}
+
+task logContainer(type: DockerLogsContainer, dependsOn: dockerRun) {
+    targetContainerId { createAppContainer.containerId }
+    follow = true
+    tailAll = true
+    onNext { message ->
+        logger.quiet message.toString() // each log message from the container will be passed as it's made available
+    }
+}
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jre8', version: kotlin_version
+    testCompile group: 'junit', name: 'junit', version: junit_version
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
