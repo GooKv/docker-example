@@ -1,15 +1,15 @@
-#docker-example
+# docker-example
 Minimal docker app with fat kotlin jar (includes stdlib)
 
-##Requirements
+## Requirements
 Docker should be installed, getting started guide is [here](https://docs.docker.com/get-started/)
 
-##Running
+## Running
 `./gradlew dockerRun` to run container
 
 `./gradlew logContainer` to run and log application output
 
-##Implementation description
+## Implementation description
 Fat jar is assembled for `kotlin-stdlib` to be added to classpath.
 
 Entry point is `MainKt.class`, as described in a generated manifest.
